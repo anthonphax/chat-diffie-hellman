@@ -1,6 +1,7 @@
 import random
 import threading
 import socket
+from caesar_cipher import caesar_cipher, caesar_decipher
 
 # Configurações do servidor
 SERVER_HOST = 'localhost'
@@ -51,7 +52,7 @@ def find_primitive_root(p):
                 break
         if is_primitive_root:
             primitive.append(g)
-
+    random.seed(42)
     return random.choice(primitive)
 
 def generate_keys(p, g):
@@ -68,8 +69,13 @@ def receive_messages(client_socket):
         try:
             message = client_socket.recv(1024)
             if not message:
+                print("Conexão fechada pelo servidor.")
                 break
+
+            message = caesar_decipher(message, shared_key)
             print(f"\nMensagem recebida: {message.decode()}")
+        except socket.timeout:
+            print("Esperando por mensagens...")
         except Exception as e:
             print(f"Erro ao receber a mensagem: {e}")
             break
@@ -82,23 +88,24 @@ def start_client():
     threading.Thread(target=receive_messages, args=(client_socket,), daemon=True).start()
 
     # Diffie-Hellman
-    p = input("digite número primo: ")
+    p = 23
     p = int(p)
     g = find_primitive_root(p)
     print(f"A raiz primitiva de {p} é: {g}")
 
     private_key, public_key = generate_keys(p, g)
+
     print(f"Cliente - Chave Privada: {private_key}, Chave Pública: {public_key}")
 
     # Envia o número primo (necessário para calcular g pelo outro cliente)
-
-    #criptografas p e pública para cesar (%26)
-
     client_socket.send(str(p).encode())
 
     # Envia a chave pública do cliente e recebe a chave pública do servidor
     client_socket.send(str(public_key).encode())
     
+    server_public_key = int(client_socket.recv(1024).decode())
+    print(f"Chave pública do servidor recebida: {server_public_key}")
+
     try:
         server_public_key = int(client_socket.recv(1024).decode())
     except ValueError:
@@ -107,6 +114,7 @@ def start_client():
         return
 
     # Calcula a chave compartilhada
+    global shared_key
     shared_key = calculate_shared_key(server_public_key, private_key, p)
     print(f"Cliente - Chave Compartilhada: {shared_key}")   
 
@@ -115,6 +123,12 @@ def start_client():
         if message.lower() == 'sair':
             break
         
+        # Gera novas chaves para cada mensagem
+        private_key, public_key = generate_keys(p, g)
+        print(f"Nova Chave Privada: {private_key}, Nova Chave Pública: {public_key}")
+
+        message = caesar_cipher(message, int(public_key))
+
         client_socket.send(message.encode())
 
     client_socket.close()

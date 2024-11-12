@@ -9,6 +9,14 @@ SERVER_PORT = 3000
 clients = []
 
 def handle_client(client_socket):
+    # Receber o número primo
+    prime_number = client_socket.recv(1024).decode()
+    print(f"Número primo recebido: {prime_number}")
+
+    # Receber a chave pública do cliente
+    public_key = client_socket.recv(1024).decode()
+    print(f"Chave pública recebida: {public_key}")
+
     while True:
         try:
             # Recebe a mensagem do cliente
